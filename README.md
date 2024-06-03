@@ -12,4 +12,9 @@ API_KEY=your_api_key
 
 ## Run the app
 ```
-fast
+fastapi run Models/Model_selection.py --port 8000
+
+fastapi run Models/GPT.py --port 8001
+
+
+```

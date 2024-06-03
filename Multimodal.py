@@ -32,7 +32,7 @@ class Multimodal:
         while True:
             prompt = input("Enter the prompt: ")
             response = self.multimodal(prompt)
-            print(response)
+            print(response['response'])
 
 if __name__ == "__main__":
     Multimodal().run()
