@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from openai import OpenAI
 
 client = OpenAI()
-import os
 
 class GPT:
     def __init__(self):
@@ -38,5 +37,6 @@ async def root():
     return {"message": "GPT API is running!"}
 
 @app.post("/gpt")
-async def gpt(prompt: str):
-    return {"response": Model.generate_response(prompt)}
+async def gpt(input_data: dict):
+    prompt = input_data["prompt"]
+    return {"Type": "Text", "Response": Model.generate_response(prompt)}
