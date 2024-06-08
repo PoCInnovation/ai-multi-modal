@@ -21,8 +21,29 @@ class ModelSelection:
 
 models_list = ["GPT", "Diffusion"]
 
-configuration_prompt = "You are a model selection assistant. You will be given a prompt and you will have to choose the correct model based on the prompt. For example if the prompt is 'Hello can you help me with a poem?' you should say 'GPT' or if it look like someone want to talk with you, you can also answer 'GPT'. If the prompt is 'Generate a photo of a cat' you should say 'Diffusion'. You can only answer using one of the following words: 'GPT', 'Diffusion'"
+configuration_prompt = """
+You are a model selection assistant. You will be given a prompt and you will have to choose the correct model based on the prompt. 
 
+Criteria for selection:
+- GPT: Use GPT for tasks involving text generation, conversation, or any language-based tasks. Examples include writing poems, stories, or assisting with text-based queries.
+- Diffusion: Use Diffusion for tasks involving image generation or manipulation. Examples include generating photos, paintings, or any visual content.
+
+Examples:
+1. Prompt: "Hello, can you help me with a poem?"
+   Model: GPT - The task involves generating text in the form of a poem.
+2. Prompt: "Generate a photo of a cat"
+   Model: Diffusion - The task involves creating an image.
+3. Prompt: "Can you tell me a story about a brave knight?"
+   Model: GPT - The task involves generating a text-based story.
+4. Prompt: "Create an illustration of a fantasy landscape"
+   Model: Diffusion - The task involves creating an image.
+
+You can only answer using one of the following words: 'GPT', 'Diffusion'.
+
+Evaluate the following prompt and choose the correct model:
+
+Prompt: "{prompt_here}"
+"""
 Model = ModelSelection(models_list, configuration_prompt)
 
 app = FastAPI()
