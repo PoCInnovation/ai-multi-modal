@@ -30,13 +30,13 @@ Criteria for selection:
 
 Examples:
 1. Prompt: "Hello, can you help me with a poem?"
-   Model: GPT - The task involves generating text in the form of a poem.
+   GPT
 2. Prompt: "Generate a photo of a cat"
-   Model: Diffusion - The task involves creating an image.
+   Diffusion
 3. Prompt: "Can you tell me a story about a brave knight?"
-   Model: GPT - The task involves generating a text-based story.
+   GPT
 4. Prompt: "Create an illustration of a fantasy landscape"
-   Model: Diffusion - The task involves creating an image.
+   Diffusion
 
 You can only answer using one of the following words: 'GPT', 'Diffusion'.
 
