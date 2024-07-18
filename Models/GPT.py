@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import requests
+
+
+
 class GPT:
     def __init__(self):
         self.text_model_url = "http://127.0.0.1:8004/text_model"
