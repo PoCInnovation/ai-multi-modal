@@ -3,3 +3,5 @@ fastapi
 uvicorn
 openai
 matplotlib
+torch
+transformers
