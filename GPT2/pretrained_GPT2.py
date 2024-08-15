@@ -106,28 +106,48 @@ class GPT(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
-
-        self.transformer = nn.ModuleDict(dict(
-            wte = nn.Embedding(config.vocab_size, config.embed_size),
-            wpe = nn.Embedding(config.block_size, config.embed_size),
-            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
-            ln_f = nn.LayerNorm(config.embed_size),
-        ))
-        self.lm_head = nn.Linear(config.embed_size, config.vocab_size, bias=False)
+        pass
 
     def forward(self, idx):
-        # idx is of shape (B, T)
-        B, T = idx.size()
-        assert T <= self.config.block_size, f"Cannot forward sequence of length {T}, block size is only {self.config.block_size}"
-        # forward the token and posisition embeddings
-        pos = torch.arange(0, T, dtype=torch.long, device=idx.device) # shape (T)
-        pos_emb = self.transformer.wpe(pos) # position embeddings of shape (T, n_embd)
-        tok_emb = self.transformer.wte(idx) # token embeddings of shape (B, T, n_embd)
-        x = tok_emb + pos_emb
-        # forward the blocks of the transformer
-        for block in self.transformer.h:
-            x = block(x)
-        # forward the final layernorm and the classifier
-        x = self.transformer.ln_f(x)
-        logits = self.lm_head(x) # (B, T, vocab_size)
-        return logits
+        pass
+
+    @classmethod
+    def from_pretrained(cls):
+        """Loads pretrained GPT-2 model weights from huggingface"""
+
+        # use the smallest GPT2 model
+        model_name = 'gpt2'
+        from transformers import GPT2LMHeadModel
+        print("loading weights from pretrained gpt: %s" % model_name)
+
+        # initialize the model
+        config = GPTConfig()
+        model = GPT(config)
+        model_state_dict = model.state_dict()
+        sd_keys = model_state_dict.keys()
+        sd_keys = [key for key in sd_keys if not key.endswith('.attn.bias')]  # exclude '.attn.bias' since it isn't a parameter
+
+        # initialize a huggingface/transformers model
+        model_hugging_face = GPT2LMHeadModel.from_pretrained(model_name)
+        sd_hugging_face = model_hugging_face.state_dict()
+        sd_keys_hugging_face = sd_hugging_face.keys()
+        sd_keys_hugging_face = [key for key in sd_keys_hugging_face if not key.endswith('.attn.masked_bias')]  # similar
+        sd_keys_hugging_face = [key for key in sd_keys_hugging_face if not key.endswith('.attn.bias')]  # similar
+
+        assert len(sd_keys_hugging_face) == len(sd_keys), f"mismatched keys: {len(sd_keys_hugging_face)} != {len(sd_keys)}"
+
+        # some weights must be transposed from "Conv1D" module to "Linear"
+        to_transpose = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
+        for key in sd_keys_hugging_face:
+            if any(key.endswith(weight) for weight in to_transpose):
+                # transpose the weights if necessary
+                assert sd_hugging_face[key].shape[::-1] == model_state_dict[key].shape
+                with torch.no_grad():
+                    model_state_dict[key].copy_(sd_hugging_face[key].t())
+            else:
+                # simply copy the other parameters
+                assert sd_hugging_face[key].shape == model_state_dict[key].shape
+                with torch.no_grad():
+                    model_state_dict[key].copy_(sd_hugging_face[key])
+
+        return model
