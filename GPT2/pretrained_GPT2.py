@@ -15,10 +15,11 @@ This class is used to store the configuration of the GPT model and is used to in
 @dataclass
 class GPTConfig:
     block_size : int = 1024 # max sequence length
-    vocab_size : int = 50304 # size of the vocabulary (50257 Byte Pair Encoding tokens + round up to the nearest multiple of 64)
+    vocab_size : int = 50257 # size of the vocabulary (50257 Byte Pair Encoding tokens + round up to the nearest multiple of 64)
     embed_size : int = 768 # dimension of the embeddings
     n_layer : int = 12 # number of layers
     nb_head : int = 12 # number of heads in the multi-head attention
+
 
 """
 CausalSelfAttention class
@@ -55,7 +56,8 @@ class CausalSelfAttention(nn.Module):
         y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
         y = self.c_proj(y)
         return y
-    
+
+
 """
 MLP class
 
@@ -73,7 +75,8 @@ class MLP(nn.Module):
         x = self.gelu(x)
         x = self.c_proj(x)
         return x
-    
+
+
 """
 Block class
 
@@ -91,17 +94,40 @@ class Block(nn.Module):
         x = x + self.attn(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x
-    
+
+
 """
 GPT class
 
 This class is used to define the GPT model.
 """
 class GPT(nn.Module):
+
     def __init__(self, config):
         super().__init__()
-        pass
+        self.config = config
 
-    def forward(self, x):
-        pass
-    
+        self.transformer = nn.ModuleDict(dict(
+            wte = nn.Embedding(config.vocab_size, config.embed_size),
+            wpe = nn.Embedding(config.block_size, config.embed_size),
+            h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
+            ln_f = nn.LayerNorm(config.embed_size),
+        ))
+        self.lm_head = nn.Linear(config.embed_size, config.vocab_size, bias=False)
+
+    def forward(self, idx):
+        # idx is of shape (B, T)
+        B, T = idx.size()
+        assert T <= self.config.block_size, f"Cannot forward sequence of length {T}, block size is only {self.config.block_size}"
+        # forward the token and posisition embeddings
+        pos = torch.arange(0, T, dtype=torch.long, device=idx.device) # shape (T)
+        pos_emb = self.transformer.wpe(pos) # position embeddings of shape (T, n_embd)
+        tok_emb = self.transformer.wte(idx) # token embeddings of shape (B, T, n_embd)
+        x = tok_emb + pos_emb
+        # forward the blocks of the transformer
+        for block in self.transformer.h:
+            x = block(x)
+        # forward the final layernorm and the classifier
+        x = self.transformer.ln_f(x)
+        logits = self.lm_head(x) # (B, T, vocab_size)
+        return logits
