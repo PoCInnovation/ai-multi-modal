@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import numpy as np
 import math
 
+
+
 """
 GPTConfig class
 
@@ -131,3 +133,40 @@ class GPT(nn.Module):
         logits = self.lm_head(x) # (B, T, vocab_size)
         return logits
 
+#################################################################
+
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import tiktoken
+
+def test_transformer_model(text, model_name="gpt2", max_length=50, temperature=0.7, top_k=50, top_p=0.9):
+    # Charger le tokenizer et le modèle
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    
+    # Tokenizer le texte d'entrée
+    inputs = tokenizer(text, return_tensors="pt")
+
+    # Assurer que le pad_token_id est défini
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    # Générer du texte à partir du modèle
+    outputs = model.generate(
+        inputs['input_ids'],
+        attention_mask=inputs['attention_mask'],
+        max_length=max_length,
+        temperature=temperature,
+        top_k=top_k,
+        top_p=top_p,
+        do_sample=True,  # Activer l'échantillonnage
+        num_return_sequences=1
+    )
+    
+    # Décoder la séquence générée
+    predicted_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    
+    return predicted_text
+
+if __name__ == "__main__":
+    message = input("Enter a message: ")
+    print("\nRésultat :", "["+test_transformer_model(message)+"]")
