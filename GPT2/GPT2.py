@@ -238,28 +238,30 @@ class DataLoaderLite:
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 print(f"Model run on {device}")
 model = GPT(GPTConfig())
 model = model.to(device)
+model = torch.compile(model)
 
-data_loader = DataLoaderLite(B=4, T=32)
+data_loader = DataLoaderLite(B=1, T=1024)
+torch.set_float32_matmul_precision('high')
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 import time
 start = time.time()
-mean_of_last_25_losses = 0
 
-for i in range(1001):
-    optimizer.zero_grad()
+for i in range(50):
+    t0 = time.time()
     x, y = data_loader.next_batch()
     x, y = x.to(device), y.to(device)
-    logits, loss = model(x, y)
+    optimizer.zero_grad()
+    with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+        logits, loss = model(x, y)
     loss.backward()
     optimizer.step()
-    print(f"step {i}, loss: {loss.item()}")
-    mean_of_last_25_losses += loss.item()
-    if i % 25 == 0:
-        print(f"mean of last 10 losses: {mean_of_last_25_losses / 25}")
-        mean_of_last_25_losses = 0
+    torch.cuda.synchronize()
+    t1 = time.time()
+    print(f"step {i}, loss: {loss.item()}, time: {t1 - t0}, tokens/s: {1024 / (t1 - t0)}")
 end = time.time()
 
 print(f"Final time : {end - start}")
