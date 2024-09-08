@@ -120,7 +120,17 @@ class GPT(nn.Module):
         self.lm_head = nn.Linear(config.embed_size, config.vocab_size, bias=False)
 
         # wte and lm_head need to be the same weight matrix (they share weights and we save 30% of model params)   
-        # self.transformer.wte.weight = self.lm_head.weight
+        self.transformer.wte.weight = self.lm_head.weight
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        if isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, std=0.02)
+            
 
     def forward(self, idx, targets):
         # idx is of shape (B, T)
@@ -236,7 +246,9 @@ data_loader = DataLoaderLite(B=4, T=32)
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 import time
 start = time.time()
-for i in range(50):
+mean_of_last_25_losses = 0
+
+for i in range(1001):
     optimizer.zero_grad()
     x, y = data_loader.next_batch()
     x, y = x.to(device), y.to(device)
@@ -244,6 +256,10 @@ for i in range(50):
     loss.backward()
     optimizer.step()
     print(f"step {i}, loss: {loss.item()}")
+    mean_of_last_25_losses += loss.item()
+    if i % 25 == 0:
+        print(f"mean of last 10 losses: {mean_of_last_25_losses / 25}")
+        mean_of_last_25_losses = 0
 end = time.time()
 
 print(f"Final time : {end - start}")
