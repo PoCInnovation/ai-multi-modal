@@ -234,6 +234,8 @@ class DataLoaderLite:
 
 # -----------------------------------------------------------------------------
 
+# Define the number of steps to accumulate gradients before updating
+accumulation_steps = 4  # Modify this based on your needs and GPU memory constraints
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -248,20 +250,40 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 import time
 start = time.time()
 
+# Initialize gradient accumulation variables
+accumulated_loss = 0.0
 for i in range(500):
     t0 = time.time()
     x, y = data_loader.next_batch()
     x, y = x.to(device), y.to(device)
-    optimizer.zero_grad()
+
+    if i % accumulation_steps == 0:
+        optimizer.zero_grad()
+
     with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
         logits, loss = model(x, y)
+
+    # Normalize loss to account for gradient accumulation
+    loss = loss / accumulation_steps
+
+    # Backpropagate the loss
     loss.backward()
-    optimizer.step()
-    torch.cuda.synchronize()
-    t1 = time.time()
-    tokens_per_sec = (data_loader.B * data_loader.T) / (t1 - t0)
-    dt = (t1 - t0) * 1000
-    print(f"step {i}, loss: {loss.item()}, dt: {dt:.2f}ms, tokens/sec: {tokens_per_sec:.2f}")
+
+    # Accumulate loss for logging
+    accumulated_loss += loss.item()
+
+    # Perform optimizer step and reset gradients after accumulation
+    if (i + 1) % accumulation_steps == 0:
+        optimizer.step()
+        torch.cuda.synchronize()
+        t1 = time.time()
+        tokens_per_sec = (data_loader.B * data_loader.T) / (t1 - t0)
+        dt = (t1 - t0) * 1000
+        print(f"step {i+1}, loss: {accumulated_loss:.4f}, dt: {dt:.2f}ms, tokens/sec: {tokens_per_sec:.2f}")
+
+        # Reset accumulated loss
+        accumulated_loss = 0.0
+
 end = time.time()
 
 print(f"Final time : {end - start}")
