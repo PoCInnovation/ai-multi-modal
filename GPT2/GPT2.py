@@ -47,10 +47,8 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.nb_head, C // self.nb_head).transpose(1, 2) # (B, nh, T, hs)
         v = v.view(B, T, self.nb_head, C // self.nb_head).transpose(1, 2) # (B, nh, T, hs)
         
-        attn = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        attn = attn.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
-        attn = F.softmax(attn, dim=-1)
-        y = attn @ v 
+        y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        
         y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
         y = self.c_proj(y)
         return y
@@ -244,13 +242,13 @@ model = GPT(GPTConfig())
 model = model.to(device)
 model = torch.compile(model)
 
-data_loader = DataLoaderLite(B=1, T=1024)
+data_loader = DataLoaderLite(B=4, T=1024)
 torch.set_float32_matmul_precision('high')
 optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
 import time
 start = time.time()
 
-for i in range(50):
+for i in range(500):
     t0 = time.time()
     x, y = data_loader.next_batch()
     x, y = x.to(device), y.to(device)
@@ -261,7 +259,9 @@ for i in range(50):
     optimizer.step()
     torch.cuda.synchronize()
     t1 = time.time()
-    print(f"step {i}, loss: {loss.item()}, time: {t1 - t0}, tokens/s: {1024 / (t1 - t0)}")
+    tokens_per_sec = (data_loader.B * data_loader.T) / (t1 - t0)
+    dt = (t1 - t0) * 1000
+    print(f"step {i}, loss: {loss.item()}, dt: {dt:.2f}ms, tokens/sec: {tokens_per_sec:.2f}")
 end = time.time()
 
 print(f"Final time : {end - start}")
