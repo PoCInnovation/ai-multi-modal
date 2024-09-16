@@ -5,3 +5,4 @@ openai
 matplotlib
 torch
 transformers
+tiktoken

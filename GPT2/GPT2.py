@@ -37,7 +37,7 @@ class CausalSelfAttention(nn.Module):
         # register_buffer is used to store a tensor that is not a model parameter, which means it won't be updated during training and won't be optimized by the optimizer (bias acts as a constant)
         self.nb_head = config.nb_head # number of heads
         self.embed_size = config.embed_size # embedding size
-    
+
     def forward(self, x):
         B, T, C = x.size()
         qkv = self.c_attn(x)
@@ -46,13 +46,13 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.nb_head, C // self.nb_head).transpose(1, 2) # (B, nh, T, hs)
         q = q.view(B, T, self.nb_head, C // self.nb_head).transpose(1, 2) # (B, nh, T, hs)
         v = v.view(B, T, self.nb_head, C // self.nb_head).transpose(1, 2) # (B, nh, T, hs)
-        
-        y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
-        
+
+        y = F.scaled_dot_product_attention(q, k, v, is_causal=True) # Flash Attention
+
         y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
         y = self.c_proj(y)
         return y
-    
+
 """
 MLP class
 
@@ -71,7 +71,7 @@ class MLP(nn.Module):
         x = self.gelu(x)
         x = self.c_proj(x)
         return x
-    
+
 """
 Block class
 
@@ -89,7 +89,7 @@ class Block(nn.Module):
         x = x + self.attn(self.ln_1(x))
         x = x + self.mlp(self.ln_2(x))
         return x
-    
+
 """
 GPT class
 
@@ -117,7 +117,7 @@ class GPT(nn.Module):
         ))
         self.lm_head = nn.Linear(config.embed_size, config.vocab_size, bias=False)
 
-        # wte and lm_head need to be the same weight matrix (they share weights and we save 30% of model params)   
+        # wte and lm_head need to be the same weight matrix (they share weights and we save 30% of model params)
         self.transformer.wte.weight = self.lm_head.weight
         self.apply(self._init_weights)
 
@@ -128,7 +128,7 @@ class GPT(nn.Module):
                 torch.nn.init.zeros_(module.bias)
         if isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, std=0.02)
-            
+
 
     def forward(self, idx, targets):
         # idx is of shape (B, T)
@@ -242,13 +242,13 @@ model = GPT(GPTConfig())
 model = model.to(device)
 model = torch.compile(model)
 
-data_loader = DataLoaderLite(B=4, T=1024)
+data_loader = DataLoaderLite(B=1, T=1024)
 torch.set_float32_matmul_precision('high')
-optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4)
+optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95))
 import time
 start = time.time()
 
-for i in range(500):
+for i in range(50):
     t0 = time.time()
     x, y = data_loader.next_batch()
     x, y = x.to(device), y.to(device)
@@ -256,12 +256,13 @@ for i in range(500):
     with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
         logits, loss = model(x, y)
     loss.backward()
+    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1) # add gradiant norm cliping to avoid to "shock" the model (when model make some prediction error)
     optimizer.step()
     torch.cuda.synchronize()
     t1 = time.time()
     tokens_per_sec = (data_loader.B * data_loader.T) / (t1 - t0)
     dt = (t1 - t0) * 1000
-    print(f"step {i}, loss: {loss.item()}, dt: {dt:.2f}ms, tokens/sec: {tokens_per_sec:.2f}")
+    print(f"step {i}, loss: {loss.item()}, dt: {dt:.2f}ms, tokens/sec: {tokens_per_sec:.2f}, norm: {norm:.4f}")
 end = time.time()
 
 print(f"Final time : {end - start}")
