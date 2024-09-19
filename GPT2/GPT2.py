@@ -231,39 +231,112 @@ class DataLoaderLite:
         if self.current_position + (B * T + 1) > len(self.tokens):
             self.current_position = 0
         return x, y
+    
+def get_learning_rate(iteration, max_lr, warmup_steps, max_steps):
+    min_lr = max_lr * 0.1
+
+    if iteration < warmup_steps: # case 1 -> warmup steps
+        return max_lr * (iteration + 1) / warmup_steps
+    
+    if iteration > max_steps: # case 2 -> max steps
+        return min_lr
+    
+    # case 3 -> learning rate decay
+    decay_ratio = (iteration - warmup_steps) / (max_steps - warmup_steps)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    return min_lr + coeff * (max_lr - min_lr)
+    
 
 # -----------------------------------------------------------------------------
 
 
+import torch
+import time
+import math
+
+# Device configuration
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# Hyperparameters for LR scheduler
+warmup_steps = 10
+max_steps = 50
+max_lr = 6e-4
+min_lr = max_lr * 0.1
+
 print(f"Model run on {device}")
-model = GPT(GPTConfig())
+model = GPT(GPTConfig())  # Replace with actual model and config
 model = model.to(device)
 model = torch.compile(model)
 
-data_loader = DataLoaderLite(B=1, T=1024)
+# DataLoader setup (replace with actual DataLoaderLite)
+data_loader = DataLoaderLite(B=4, T=1024)
+
+# Set precision for matrix multiplications
 torch.set_float32_matmul_precision('high')
-optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, betas=(0.9, 0.95))
-import time
+
+# Optimizer setup
+optimizer = torch.optim.AdamW(model.parameters(), lr=max_lr, betas=(0.9, 0.95))
+
+# Learning rate scheduler with warmup and cosine annealing
+def lr_lambda(step):
+    if step < warmup_steps:
+        # Linear warmup
+        return (step + 1) / warmup_steps
+    else:
+        # Cosine annealing
+        progress = (step - warmup_steps) / (max_steps - warmup_steps)
+        return 0.5 * (1 + math.cos(math.pi * progress)) * (max_lr - min_lr) / max_lr + min_lr / max_lr
+
+scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+# Start timing
 start = time.time()
 
-for i in range(50):
+# Training loop
+for step in range(max_steps):
     t0 = time.time()
+
+    # Fetch batch from data loader
     x, y = data_loader.next_batch()
     x, y = x.to(device), y.to(device)
+
+    # Zero gradients
     optimizer.zero_grad()
+
+    # Forward pass with mixed precision
     with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
         logits, loss = model(x, y)
-    loss.backward()
-    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1) # add gradiant norm cliping to avoid to "shock" the model (when model make some prediction error)
-    optimizer.step()
-    torch.cuda.synchronize()
-    t1 = time.time()
-    tokens_per_sec = (data_loader.B * data_loader.T) / (t1 - t0)
-    dt = (t1 - t0) * 1000
-    print(f"step {i}, loss: {loss.item()}, dt: {dt:.2f}ms, tokens/sec: {tokens_per_sec:.2f}, norm: {norm:.4f}")
-end = time.time()
 
-print(f"Final time : {end - start}")
+    # Backpropagation
+    loss.backward()
+
+    # Gradient clipping to avoid exploding gradients
+    norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
+    # Step the optimizer
+    optimizer.step()
+
+    # Step the scheduler
+    scheduler.step()
+
+    # Synchronize to ensure GPU operations finish
+    torch.cuda.synchronize()
+
+    t1 = time.time()
+
+    # Calculate tokens processed per second
+    tokens_processed = data_loader.B * data_loader.T
+    tokens_per_sec = tokens_processed / (t1 - t0)
+    dt = (t1 - t0) * 1000  # Time difference in ms
+
+    # Get the current learning rate for logging
+    lr = scheduler.get_last_lr()[0]
+
+    # Logging
+    print(f"step {step:4d} | loss: {loss.item():.6f} | lr: {lr:.4e} | norm: {norm:.4f} | dt: {dt:.2f}ms | tokens/sec: {tokens_per_sec:.2f}")
+
+# End timing
+end = time.time()
+print(f"Final time: {end - start:.2f} seconds")
 
