@@ -1,23 +1,19 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from openai import OpenAI
+import requests
 
-client = OpenAI()
-import os
+
 
 class GPT:
     def __init__(self):
-        self.model = "gpt-3.5-turbo-0125"
+        self.text_model_url = "http://127.0.0.1:8004/text_model"
 
     def generate_response(self, prompt: str):
-        response = client.chat.completions.create(model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=100,
-        temperature=0.7)
-        return response.choices[0].message.content
+        response = requests.post(self.text_model_url, json={"prompt": prompt})
+        if response.status_code == 200:
+            return response.json()["Response"]
+        else:
+            return "Error in text model API call"
 
 app = FastAPI()
 
@@ -38,5 +34,7 @@ async def root():
     return {"message": "GPT API is running!"}
 
 @app.post("/gpt")
-async def gpt(prompt: str):
-    return {"response": Model.generate_response(prompt)}
+async def gpt(input_data: dict):
+    prompt = input_data["prompt"]
+    return {"Type": "Text", "Response": Model.generate_response(prompt)}
+

@@ -2,3 +2,7 @@ requests
 fastapi
 uvicorn
 openai
+matplotlib
+torch
+transformers
+tiktoken
