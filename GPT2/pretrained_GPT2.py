@@ -396,3 +396,5 @@ for step in range(max_steps):
 
 if ddp:
     destroy_process_group()
+
+# For start use the following command : torchrun --standalone --nproc_per_node=2 pretrained_GPT2.py
