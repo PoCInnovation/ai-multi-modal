@@ -189,11 +189,11 @@ def load_tokens(filename):
     return ptt
 
 class DataLoaderLite:
-    def __init__(self, B, T, process_rank, num_process, split):
+    def __init__(self, B, T, process_rank, num_processes, split):
         self.B = B
         self.T =T
         self.process_rank = process_rank
-        self.num_process = num_process
+        self.num_processes = num_processes
         assert split in {'train', 'val'}
 
         data_root = "edu_fineweb10B"
