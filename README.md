@@ -28,4 +28,5 @@ fastapi dev Models/Model_selection.py --port 8000 --reload &
 fastapi dev Models/GPT.py --port 8001 --reload &
 fastapi dev Models/Diffusion.py --port 8002 --reload &
 fastapi dev Models/Model_verification.py --port 8003 --reload &
+fastapi dev Models/Model_GPT2.py --port 8004 --reload &
 ```

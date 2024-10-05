@@ -40,7 +40,7 @@ class CausalSelfAttention(nn.Module):
         # register_buffer is used to store a tensor that is not a model parameter, which means it won't be updated during training and won't be optimized by the optimizer (bias acts as a constant)
         self.n_head = config.nb_head # number of heads
         self.n_embd = config.embed_size # embedding size
-    
+
     def forward(self, x):
         B, T, C = x.size()
         qkv = self.c_attn(x)
@@ -49,11 +49,11 @@ class CausalSelfAttention(nn.Module):
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2) # (B, nh, T, hs)
-        
+
         attn = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
         attn = attn.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
         attn = F.softmax(attn, dim=-1)
-        y = attn @ v 
+        y = attn @ v
         y = y.transpose(1, 2).contiguous().view(B, T, C) # re-assemble all head outputs side by side
         y = self.c_proj(y)
         return y
@@ -123,7 +123,7 @@ class GPT(nn.Module):
         pos_emb = self.transformer.wpe(pos) # position embeddings of shape (T, n_embd)
         tok_emb = self.transformer.wte(idx) # token embeddings of shape (B, T, n_embd)
         x = tok_emb + pos_emb
-    
+
         # forward the blocks of the transformer
         for block in self.transformer.h:
             x = block(x)
@@ -142,14 +142,14 @@ def test_transformer_model(text, model_name="gpt2", max_length=50, temperature=0
     # Charger le tokenizer et le modèle
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name)
-    
+
     # Tokenizer le texte d'entrée
     inputs = tokenizer(text, return_tensors="pt")
 
     # Assurer que le pad_token_id est défini
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
-    
+
     # Générer du texte à partir du modèle
     outputs = model.generate(
         inputs['input_ids'],
@@ -161,10 +161,10 @@ def test_transformer_model(text, model_name="gpt2", max_length=50, temperature=0
         do_sample=True,  # Activer l'échantillonnage
         num_return_sequences=1
     )
-    
+
     # Décoder la séquence générée
     predicted_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    
+
     return predicted_text
 
 if __name__ == "__main__":
