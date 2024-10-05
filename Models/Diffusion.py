@@ -3,31 +3,54 @@ from fastapi.middleware.cors import CORSMiddleware
 import base64
 import os
 import requests
-import openai
+from openai import OpenAI
 
-# Set OpenAI API Key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class Diffusion:
     def __init__(self):
         self.image_path = "generated_image.png"  # Local path for the generated image
 
     def generate_response(self, prompt: str):
-        return self.create_image(prompt)
+        # Upgrade the prompt using GPT-3.5
+        upgraded_prompt = self.upgrade_prompt_with_gpt(prompt)
+        print(f"Upgraded prompt: {upgraded_prompt}")
+        return self.create_image(upgraded_prompt)
+
+    def upgrade_prompt_with_gpt(self, prompt: str):
+        """
+        Use GPT-3.5 to upgrade the initial prompt.
+        """
+        try:
+            # Use the chat completions API
+            gpt_response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an assistant that helps improve prompts for image generation."},
+                    {"role": "user", "content": f"Improve the following image generation prompt to make it more descriptive and creative:\n\n'{prompt}'"}
+                ],
+                max_tokens=50,  # Limit the length of the upgraded prompt
+                temperature=0.7,  # Adjust temperature for more creativity
+            )
+            return gpt_response.choices[0].message.content
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error upgrading prompt: {str(e)}")
 
     def create_image(self, prompt: str):
         try:
             # Call the OpenAI API to generate an image
-            response = openai.Image.create(
+            response = client.images.generate(
+                model="dall-e-3",
                 prompt=prompt,
+                size="1024x1024",
+                quality="standard",
                 n=1,
-                size="256x256",
-                response_format="url"  # Use "url" to get the URL of the generated image
             )
-            image_url = response['data'][0]['url']
+            image_url = response.data[0].url
 
             # Download the image
             self.download_image(image_url)
+            self.image_path = "generated_image.png"
 
             return self.image_path  # Return the local path of the downloaded image
         except Exception as e:

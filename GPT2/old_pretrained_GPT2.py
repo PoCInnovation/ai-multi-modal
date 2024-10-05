@@ -25,7 +25,7 @@ class CausalSelfAttention(nn.Module):
         self.attn_head = config.number_head_attention
         self.head_size = self.size // self.attn_head # 64
         self.proj = nn.Linear(self.size, self.size)
-        
+
     def forward(self, x):
         B, T, C = x.size()
         qkv = self.concat_attention(x)
@@ -39,8 +39,8 @@ class CausalSelfAttention(nn.Module):
         # multiplication de q et k :
         attn = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1))) # (B, nh, T, T)
 
-        # le tril de la matrice 
-        attn = attn.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))   
+        # le tril de la matrice
+        attn = attn.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
 
         # softmax
         attn = self.softmax(attn, dim=-1)
@@ -53,7 +53,7 @@ class CausalSelfAttention(nn.Module):
         return out
 
 
-        
+
 class MLP(nn.Module):
     def __init__(self, config):
         super().__init__()
@@ -70,7 +70,7 @@ class MLP(nn.Module):
 
 
 class DecoderBlock(nn.Module):
-    
+
     def __init__(self, config):
         super().__init__()
         self.layer_norm_1 = nn.LayerNorm(config.layer_size)
@@ -89,9 +89,9 @@ class Model(nn.Model):
         super().__init__(None)
 
         self.tokenizer = None
-    
+
         self.decoder_block = DecoderBlock()
-        
+
 
 
 

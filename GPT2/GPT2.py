@@ -231,22 +231,22 @@ class DataLoaderLite:
         if self.current_position + (B * T + 1) > len(self.tokens):
             self.current_position = 0
         return x, y
-    
+
 def get_learning_rate(iteration, max_lr, warmup_steps, max_steps):
     min_lr = max_lr * 0.1
 
     if iteration < warmup_steps: # case 1 -> warmup steps
         return max_lr * (iteration + 1) / warmup_steps
-    
+
     if iteration > max_steps: # case 2 -> max steps
         return min_lr
-    
+
     # case 3 -> learning rate decay
     decay_ratio = (iteration - warmup_steps) / (max_steps - warmup_steps)
     assert 0 <= decay_ratio <= 1
     coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
     return min_lr + coeff * (max_lr - min_lr)
-    
+
 
 # -----------------------------------------------------------------------------
 

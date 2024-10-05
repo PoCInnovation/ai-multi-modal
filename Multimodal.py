@@ -3,7 +3,10 @@ matplotlib.use('Agg')  # Use the Agg backend for non-interactive environments
 
 import requests
 from config import api_map
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+
 import base64
 
 class Multimodal:
@@ -72,14 +75,15 @@ class Multimodal:
             image_path = response["Response"]
             try:
                 img = plt.imread(image_path)
-                plt.imshow(img)
-                plt.axis("off")
-                plt.savefig("output_image.png", bbox_inches='tight', pad_inches=0)  # Save the figure instead of showing it
-                print("Image saved as 'output_image.png'")
+                fig, ax = plt.subplots(figsize=(16, 16))  # Adjust figure size as needed (8x8 is just an example)
+                ax.imshow(img)
+                ax.axis("off")
+                plt.subplots_adjust(left=0, right=1, top=1, bottom=0)  # No margins
+                plt.show()
             except Exception as e:
                 print(f"Failed to display image: {e}")
-        else:
-            print("Invalid response")
+            finally:
+                plt.close()  # Ensure plot is closed to free memory
 
     def run(self):
         while True:
