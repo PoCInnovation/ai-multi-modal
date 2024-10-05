@@ -19,14 +19,15 @@ class ModelSelection:
         temperature=0.7)
         return response.choices[0].message.content
 
-models_list = ["GPT", "Diffusion"]
+models_list = ["GPT", "Diffusion", "text_completion"]
 
 configuration_prompt = """
-You are a model selection assistant. You will be given a prompt and you will have to choose the correct model based on the prompt. 
+You are a model selection assistant. You will be given a prompt and you will have to choose the correct model based on the prompt.
 
 Criteria for selection:
 - GPT: Use GPT for tasks involving text generation, conversation, or any language-based tasks. Examples include writing poems, stories, or assisting with text-based queries.
 - Diffusion: Use Diffusion for tasks involving image generation or manipulation. Examples include generating photos, paintings, or any visual content.
+- text_completion: Use text_completion ONLY when the prompt explicitly asks to complete a sentence or text. Examples include "Complete the following sentence: ..." or "Finish the phrase ...".
 
 Examples:
 1. Prompt: "Hello, can you help me with a poem?"
@@ -37,13 +38,19 @@ Examples:
    GPT
 4. Prompt: "Create an illustration of a fantasy landscape"
    Diffusion
+5. Prompt: "Complete the following sentence: 'Roses are red, violets are blue...'"
+   text_completion
+6. Prompt: "Can you explain what a large language model (LLM) is?"
+   GPT
 
-You can only answer using one of the following words: 'GPT', 'Diffusion'.
+You can only answer using one of the following words: 'text_completion', 'Diffusion', 'GPT'.
 
 Evaluate the following prompt and choose the correct model:
 
 Prompt: "{prompt_here}"
 """
+
+
 Model = ModelSelection(models_list, configuration_prompt)
 
 app = FastAPI()
